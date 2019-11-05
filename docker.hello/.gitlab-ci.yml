@@ -1,0 +1,98 @@
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  GIT_DEPTH: "1"
+ 
+
+before_script:
+  - SNAME_IMAGE=$CI_PROJECT_NAMESPACE_$CI_PROJECT_PATH
+  - dockermanifest=$(pwd)"/docker.manifest.json"
+  - VERSION=$(jq -r ".version" $dockermanifest)
+  - LATEST=$(jq -r ".latest" $dockermanifest)
+  - RELEASEMODE=$(jq -r ".releasemode" $dockermanifest)
+  - DEV_IMAGE=$SNAME_IMAGE:$VERSION._$CI_COMMIT_SHORT_SHA 
+  - RELEASE_IMAGE=$SNAME_IMAGE:$VERSION
+  - LATEST_IMAGE=$SNAME_IMAGE:latest
+
+
+stages:
+- prepare
+- informations
+- build-image
+- push-to-dev
+- push-to-release  
+- promote-to-prod
+
+prepare:
+  stage: prepare
+  script:
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@srvgitlab/pipeline/gitlab-ci-scripts.git
+  - chmod 777 -R $CI_PROJECT_DIR/gitlab-ci-scripts
+
+  
+  
+  artifacts:
+    paths:
+     - gitlab-ci-scripts/
+
+Informations:
+  stage: informations
+  script:
+
+  - echo "------------Applications informations------------"
+  - echo "VERSION            ===== $VERSION"
+  - echo "RELEASEMODE           ===== $RELEASEMODE"
+  - echo "LATEST           ===== $LATEST"
+
+  
+  
+  - echo "------------Gitlab informations------------"
+  - echo "CI_COMMIT_SHORT_SHA        ===== $CI_COMMIT_SHORT_SHA"
+  - echo "CI_COMMIT_REF_NAME   ===== $CI_COMMIT_REF_NAME"
+  - echo "CI_PROJECT_NAMESPACE ===== $CI_PROJECT_NAMESPACE"
+  - echo "CI_PROJECT_PATH      ===== $CI_PROJECT_PATH"
+  - echo ""
+  - echo "------------Docker informations------------"
+  - docker --version
+  - echo ""
+  - echo "------------Docker image informations------------"
+  - echo "SNAME_IMAGE            ===== $SNAME_IMAGE"
+  - echo "DEV_IMAGE              ===== $DEV_IMAGE"
+  - echo "RELEASE_IMAGE          ===== $RELEASE_IMAGE"
+  - echo "LATEST_IMAGE           ===== $LATEST_IMAGE"
+
+
+
+  - echo ""
+
+  
+Build Docker Image:
+  stage: build-image
+  script:
+  - echo "------------Build Docker Image------------"
+  - $CI_PROJECT_DIR/gitlab-ci-scripts/dockerbuild.sh -c $CI_COMMIT_SHORT_SHA -i $DEV_IMAGE -r $RELEASE_IMAGE -l $LATEST_IMAGE -m $RELEASEMODE -n $LATEST
+#######
+
+Push to dev registry:
+  stage: push-to-dev
+  script:
+  - echo "------------Push to dev registry------------"
+  - $CI_PROJECT_DIR/gitlab-ci-scripts/dockerpushtodev.sh -p $RPASSW -i $DEV_IMAGE -r $RELEASE_IMAGE -l $LATEST_IMAGE -m $RELEASEMODE -n $LATEST  
+
+Push to release registry:
+  stage: push-to-release
+  script:
+  - $CI_PROJECT_DIR/gitlab-ci-scripts/dockerpushtorelease.sh -p $RPASSW -r $RELEASE_IMAGE -l $LATEST_IMAGE -m $RELEASEMODE -n $LATEST 
+  only:
+  - master
+
+Promote to production:
+  stage: promote-to-prod
+  script:
+  - echo "------------Promote to production------------" 
+  - bash -x $CI_PROJECT_DIR/gitlab-ci-scripts/dockerpromote.sh -c $CI_COMMIT_SHORT_SHA -u $CI_PROJECT_URL -t $GIT_TOKEN -n $CI_PROJECT_NAME -d $CI_PROJECT_PATH -i $SNAME_IMAGE
+  when: 
+   manual
+  only:
+  - master
+
+

@@ -1,0 +1,48 @@
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  GIT_DEPTH: "1"
+
+
+
+before_script:
+  - PROJECT=$(echo $CI_COMMIT_TITLE | awk '{print $3}'| sed s/\'//g)
+  - VERSION=$(jq -r ".version" $PROJECT)
+  - LATEST=$(jq -r ".latest" $PROJECT)
+  - SNAME_IMAGE=$(jq -r ".image_name" $PROJECT)
+  - PROD_IMAGE=$SNAME_IMAGE:$VERSION
+  - LATEST_IMAGE=$SNAME_IMAGE:latest
+
+stages:
+- informations
+- push-to-prod
+
+Informations:
+  stage: informations
+  script:
+  - echo "------------Applications informations------------"
+  - echo "PROJECT                 =====   $PROJECT"
+  - echo "PROD_IMAGE              =====   $PROD_IMAGE"
+  - echo "LATEST_IMAGE             =====   $PROD_IMAGE"
+  - echo "LATEST                   =====   $LATEST"
+ 
+  - echo "------------Gitlab informations------------"
+  - echo "CI_COMMIT_TITLE      =====  $CI_COMMIT_TITLE"
+
+  - echo "------------Docker informations------------"
+  - docker --version
+  - echo ""
+  - echo "------------Docker registry informations------------"
+  - echo "RPASSW       ===== $RPASSW"
+  - echo ""
+
+  
+Push to prod registry:
+  stage: push-to-prod
+  script:
+  - echo "------------Push to prod registry------------"
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@srvgitlab/pipeline/gitlab-ci-scripts.git
+  - chmod 777 -R $CI_PROJECT_DIR/gitlab-ci-scripts
+  - $CI_PROJECT_DIR/gitlab-ci-scripts/dockerpushtoprod.sh -p $RPASSW -r $PROD_IMAGE -l $LATEST_IMAGE -n $LATEST -o $PROJECT 
+  only:
+  - master
+

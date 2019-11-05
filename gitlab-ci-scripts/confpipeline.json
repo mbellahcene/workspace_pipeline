@@ -1,0 +1,31 @@
+{
+        "docker" :
+        {
+                "version" : "19.2",
+                "ostype"  : "centos",
+                "dev" :
+                {
+                     "registry" :
+                     {
+                         "url" : "srvnexusdev:8082",
+                         "login" : "admin"
+                     }
+                },
+                "release" :
+                {
+                     "registry" :
+                     {
+                         "url" : "srvnexusdev:8083",
+                         "login" : "admin"
+                     }
+                },
+                "prod" :
+                {
+                     "registry" :
+                     {
+                         "url" : "srvnexusprod:8083",
+                         "login" : "admin"
+                     }
+                }
+        }
+}
